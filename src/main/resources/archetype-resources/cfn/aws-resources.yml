@@ -1,0 +1,50 @@
+#set( $symbol_dollar = '$' )
+AWSTemplateFormatVersion: 2010-09-09
+
+Transform:
+- AWS::Serverless-2016-10-31
+- AWS::CodeStar
+
+Parameters:
+  ProjectId:
+    Type: String
+    Description: AWS CodeStar projectID used to associate new resources to team members
+
+Resources:
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      DefinitionUri: ./api.yml
+      StageName: prod
+      Variables:
+        LambdaFunctionName: !Ref SpringFunction
+
+  SpringFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambda-backend/target/lambda-backend.jar
+      Handler: ${package}.MainHandler
+      Runtime: java8
+      MemorySize: 256
+      Timeout: 30
+      Role:
+        Fn::ImportValue:
+          !Join ['-', [!Ref 'ProjectId', !Ref 'AWS::Region', 'LambdaTrustRole']]
+      Events:
+        ProxyEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /{proxy+}
+            Method: ANY
+
+Outputs:
+  ApiUrl:
+    Description: "Microservice API endpoint"
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !Ref Api
+        - '.execute-api.'
+        - !Ref AWS::Region
+        - '.amazonaws.com/prod/'
